@@ -10,13 +10,13 @@ import time
 from datetime import timedelta
 
 import torch
-from datasets import interleave_datasets, load_dataset
+from datasets import interleave_datasets, load_dataset, load_from_disk
 from torch.distributed.elastic.multiprocessing.errors import record
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 import fla  # noqa
 from fla.modules.fused_linear_cross_entropy import FusedLinearCrossEntropyLoss
-from fla.ops.common.utils import prepare_position_ids
+from fla.ops.utils import prepare_position_ids
 from flame.components.checkpoint import TrainState
 from flame.config_manager import JobConfig
 from flame.data import build_dataloader, shuffle
@@ -155,20 +155,21 @@ def main(job_config: JobConfig):
 
     min_num_shards = dp_degree * job_config.training.num_workers
     if len(job_config.training.dataset.split(",")) == 1:
-        dataset = load_dataset(
-            path=job_config.training.dataset,
-            name=getattr(job_config.training, "dataset_name", None),
-            data_dir=getattr(job_config.training, "data_dir", None),
-            data_files=getattr(job_config.training, "data_files", None),
-            split=job_config.training.dataset_split or "train",
-            trust_remote_code=True,
-            streaming=job_config.training.streaming,
-            num_proc=(
-                job_config.training.num_workers
-                if not job_config.training.streaming
-                else None
-            ),
-        )
+        dataset = load_from_disk(getattr(job_config.training, "data_dir", None))
+        # dataset = load_dataset(
+        #     path=job_config.training.dataset,
+        #     name=getattr(job_config.training, "dataset_name", None),
+        #     data_dir=getattr(job_config.training, "data_dir", None),
+        #     data_files=getattr(job_config.training, "data_files", None),
+        #     split=job_config.training.dataset_split or "train",
+        #     trust_remote_code=True,
+        #     streaming=job_config.training.streaming,
+        #     num_proc=(
+        #         job_config.training.num_workers
+        #         if not job_config.training.streaming
+        #         else None
+        #     ),
+        # )
         logger.info(f"{dataset}")
 
         logger.info(f"Shuffling the dataset with seed {job_config.training.seed}")
